@@ -1,7 +1,8 @@
 import os
+import json
 import sqlite3
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import httpx
 import jwt
@@ -41,15 +42,27 @@ def init_db() -> None:
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS products (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            name        TEXT    NOT NULL,
-            description TEXT,
-            price       REAL    NOT NULL,
-            stock       INTEGER NOT NULL DEFAULT 0,
-            created_at  TEXT    DEFAULT (datetime('now'))
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            name           TEXT    NOT NULL,
+            description    TEXT,
+            price          REAL    NOT NULL,
+            stock          INTEGER NOT NULL DEFAULT 0,
+            image_url      TEXT,
+            category       TEXT,
+            specifications TEXT,
+            created_at     TEXT    DEFAULT (datetime('now'))
         )
         """
     )
+    # Migration: add new columns to existing databases
+    existing = [row[1] for row in conn.execute("PRAGMA table_info(products)").fetchall()]
+    for col, definition in [
+        ("image_url",      "TEXT"),
+        ("category",       "TEXT"),
+        ("specifications", "TEXT"),
+    ]:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE products ADD COLUMN {col} {definition}")
     conn.commit()
     conn.close()
 
@@ -68,10 +81,23 @@ app = FastAPI(title="Products Service", lifespan=lifespan)
 
 
 class ProductCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-    price: float
-    stock: int = 0
+    name:           str
+    description:    Optional[str]            = None
+    price:          float
+    stock:          int                      = 0
+    image_url:      Optional[str]            = None
+    category:       Optional[str]            = None
+    specifications: Optional[Dict[str, Any]] = None
+
+
+def _row_to_dict(row) -> dict:
+    d = dict(row)
+    if d.get("specifications") and isinstance(d["specifications"], str):
+        try:
+            d["specifications"] = json.loads(d["specifications"])
+        except (json.JSONDecodeError, TypeError):
+            d["specifications"] = {}
+    return d
 
 
 # ---------------------------------------------------------------------------
@@ -150,51 +176,56 @@ def health():
 
 
 @app.get("/products")
-async def list_products():
-    # For internal replica reads, always use local DB to avoid infinite loop
+def list_products():
     conn = get_db()
     rows = conn.execute(
-        "SELECT id, name, description, price, stock, created_at FROM products ORDER BY id"
+        "SELECT id, name, description, price, stock, image_url, category, specifications, created_at "
+        "FROM products ORDER BY id"
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    return [_row_to_dict(r) for r in rows]
 
 
 @app.get("/products/{product_id}")
 def get_product(product_id: int):
     conn = get_db()
     row = conn.execute(
-        "SELECT id, name, description, price, stock, created_at FROM products WHERE id = ?",
+        "SELECT id, name, description, price, stock, image_url, category, specifications, created_at "
+        "FROM products WHERE id = ?",
         (product_id,),
     ).fetchone()
     conn.close()
     if not row:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
-    return dict(row)
+    return _row_to_dict(row)
 
 
 @app.post("/products", status_code=201)
 async def create_product(req: ProductCreate, _admin: dict = Depends(require_admin)):
+    specs_json = json.dumps(req.specifications, ensure_ascii=False) if req.specifications else None
+
     conn = get_db()
     cursor = conn.execute(
-        "INSERT INTO products (name, description, price, stock) VALUES (?, ?, ?, ?)",
-        (req.name, req.description, req.price, req.stock),
+        "INSERT INTO products (name, description, price, stock, image_url, category, specifications) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (req.name, req.description, req.price, req.stock, req.image_url, req.category, specs_json),
     )
     conn.commit()
     product_id = cursor.lastrowid
     conn.close()
 
     product = {
-        "id": product_id,
-        "name": req.name,
-        "description": req.description,
-        "price": req.price,
-        "stock": req.stock,
+        "id":             product_id,
+        "name":           req.name,
+        "description":    req.description,
+        "price":          req.price,
+        "stock":          req.stock,
+        "image_url":      req.image_url,
+        "category":       req.category,
+        "specifications": req.specifications,
     }
 
-    # Propagate to replica (strong consistency — write confirmed after replica ack)
-    await replicate_write("POST", "/internal/products", product)
-
+    await replicate_write("POST", "/internal/products", {**product, "specifications": specs_json})
     return product
 
 
@@ -208,8 +239,14 @@ def internal_create_product(req: dict):
     """Receives replicated writes from the primary. No JWT required."""
     conn = get_db()
     conn.execute(
-        "INSERT OR REPLACE INTO products (id, name, description, price, stock) VALUES (?, ?, ?, ?, ?)",
-        (req.get("id"), req["name"], req.get("description"), req["price"], req["stock"]),
+        "INSERT OR REPLACE INTO products "
+        "(id, name, description, price, stock, image_url, category, specifications) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            req.get("id"), req["name"], req.get("description"),
+            req["price"], req["stock"],
+            req.get("image_url"), req.get("category"), req.get("specifications"),
+        ),
     )
     conn.commit()
     conn.close()

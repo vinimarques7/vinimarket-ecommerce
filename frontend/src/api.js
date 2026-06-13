@@ -30,4 +30,7 @@ export const api = {
     request('/orders', { method: 'POST', headers: getHeaders(token), body: JSON.stringify(body) }),
   getUserOrders: (userId, token) =>
     request(`/orders/${userId}`, { headers: getHeaders(token) }),
+
+  // Gateway status
+  getStatus: () => request('/status'),
 }

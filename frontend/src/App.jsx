@@ -10,6 +10,7 @@ import Login               from './pages/Login.jsx'
 import Register            from './pages/Register.jsx'
 import Orders              from './pages/Orders.jsx'
 import Admin               from './pages/Admin.jsx'
+import Status              from './pages/Status.jsx'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
                   <Route path="/register" element={<Register />} />
                   <Route path="/orders"   element={<PrivateRoute><Orders /></PrivateRoute>} />
                   <Route path="/admin"    element={<PrivateRoute adminOnly><Admin /></PrivateRoute>} />
+                  <Route path="/status"   element={<Status />} />
                   <Route path="*"         element={<Navigate to="/" />} />
                 </Routes>
               </main>

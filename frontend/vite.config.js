@@ -10,6 +10,7 @@ export default defineConfig({
       '/products': { target: 'http://localhost:8000', changeOrigin: true },
       '/orders':   { target: 'http://localhost:8000', changeOrigin: true },
       '/health':   { target: 'http://localhost:8000', changeOrigin: true },
+      '/status':   { target: 'http://localhost:8000', changeOrigin: true },
     },
   },
 })

@@ -211,6 +211,24 @@ def gateway_health():
     }
 
 
+@app.get("/status")
+def gateway_status_json():
+    """JSON endpoint consumido pelo dashboard interno do frontend."""
+    return {
+        "gateway": {"healthy": True, "failures": 0, "last_check": _ts(), "url": f"http://localhost:{PORT}"},
+        "services": {
+            name: {
+                "healthy":    svc["healthy"],
+                "failures":   svc["failures"],
+                "last_check": svc["last_check"],
+                "url":        svc["url"],
+            }
+            for name, svc in SERVICES.items()
+        },
+        "log": list(reversed(heartbeat_log[-30:])),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Dashboard HTML
 # ---------------------------------------------------------------------------

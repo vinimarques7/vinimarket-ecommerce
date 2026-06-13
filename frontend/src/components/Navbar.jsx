@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Package, LogOut, LayoutDashboard, Zap } from 'lucide-react'
+import { ShoppingCart, Package, LogOut, LayoutDashboard, Zap, Activity } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useCart } from '../context/CartContext.jsx'
 
@@ -35,6 +35,9 @@ export default function Navbar() {
               <Package className="w-4 h-4" /> Meus Pedidos
             </Link>
           )}
+          <Link to="/status" className="px-3 py-1.5 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all flex items-center gap-1.5">
+            <Activity className="w-4 h-4" /> Status
+          </Link>
           {user?.role === 'admin' && (
             <Link to="/admin" className="px-3 py-1.5 text-sm text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 rounded-lg transition-all flex items-center gap-1.5">
               <LayoutDashboard className="w-4 h-4" /> Admin

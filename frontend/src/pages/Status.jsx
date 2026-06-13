@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Activity, CheckCircle, XCircle, Clock, RefreshCw,
-  Server, AlertTriangle, Wifi, WifiOff,
+  Server, AlertTriangle, Wifi, WifiOff, Package, Tag,
 } from 'lucide-react'
 import { api } from '../api.js'
 
@@ -30,6 +30,16 @@ export default function Status() {
   const [error,      setError]      = useState(null)
   const [countdown,  setCountdown]  = useState(5)
   const [lastUpdate, setLastUpdate] = useState(null)
+  const [products,   setProducts]   = useState([])
+  const [prodLoading, setProdLoading] = useState(true)
+
+  const fetchProducts = useCallback(() => {
+    setProdLoading(true)
+    api.getProducts()
+      .then(setProducts)
+      .catch(() => setProducts([]))
+      .finally(() => setProdLoading(false))
+  }, [])
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -47,9 +57,10 @@ export default function Status() {
 
   useEffect(() => {
     fetchStatus()
+    fetchProducts()
     const interval = setInterval(fetchStatus, 5000)
     return () => clearInterval(interval)
-  }, [fetchStatus])
+  }, [fetchStatus, fetchProducts])
 
   useEffect(() => {
     if (!lastUpdate) return
@@ -88,7 +99,7 @@ export default function Status() {
             </span>
           )}
           <button
-            onClick={fetchStatus}
+            onClick={() => { fetchStatus(); fetchProducts() }}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-all border border-slate-700"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Atualizar
@@ -208,6 +219,85 @@ export default function Status() {
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-slate-300 text-xs">{entry.msg}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Products */}
+      <div className="mt-8">
+        <h2 className="font-semibold text-white text-lg mb-4 flex items-center gap-2">
+          <Package className="w-4 h-4 text-violet-400" />
+          Produtos Cadastrados
+          {!prodLoading && (
+            <span className="text-xs text-slate-500 font-normal">({products.length} {products.length === 1 ? 'produto' : 'produtos'})</span>
+          )}
+        </h2>
+
+        {prodLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-12 bg-slate-900 rounded-xl animate-pulse border border-slate-800" />
+            ))}
+          </div>
+        ) : products.length === 0 ? (
+          <div className="flex items-center gap-3 p-5 bg-slate-900 rounded-2xl border border-slate-800">
+            <Package className="w-5 h-5 text-slate-600" />
+            <p className="text-slate-500 text-sm">Nenhum produto cadastrado.</p>
+          </div>
+        ) : (
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-800">
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">ID</th>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Produto</th>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs hidden sm:table-cell">Categoria</th>
+                  <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Preço</th>
+                  <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Estoque</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((p) => (
+                  <tr key={p.id} className="border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition-colors">
+                    <td className="px-4 py-2.5 text-slate-600 text-xs font-mono">#{p.id}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        {p.image_url ? (
+                          <img
+                            src={p.image_url}
+                            alt={p.name}
+                            className="w-8 h-8 rounded-lg object-cover flex-shrink-0 bg-slate-800"
+                            onError={e => { e.currentTarget.style.display = 'none' }}
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0">
+                            <Package className="w-4 h-4 text-slate-600" />
+                          </div>
+                        )}
+                        <span className="text-white font-medium text-xs truncate max-w-[180px]">{p.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 hidden sm:table-cell">
+                      {p.category ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-violet-300 bg-violet-500/15 border border-violet-500/30 px-2 py-0.5 rounded-full">
+                          <Tag className="w-2.5 h-2.5" />{p.category}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600 text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-emerald-400 text-xs font-semibold whitespace-nowrap">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <span className={`text-xs font-semibold ${p.stock > 0 ? 'text-slate-300' : 'text-red-400'}`}>
+                        {p.stock}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Certs (gerados automaticamente)
+certs/*.pem
+
+# Env
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db

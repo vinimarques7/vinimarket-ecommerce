@@ -24,6 +24,8 @@ export const api = {
   getProduct:  (id)      => request(`/products/${id}`),
   createProduct: (body, token) =>
     request('/products', { method: 'POST', headers: getHeaders(token), body: JSON.stringify(body) }),
+  updateProduct: (id, body, token) =>
+    request(`/products/${id}`, { method: 'PUT', headers: getHeaders(token), body: JSON.stringify(body) }),
 
   // Orders
   createOrder: (body, token) =>

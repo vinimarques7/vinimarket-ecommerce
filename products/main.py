@@ -234,6 +234,40 @@ async def create_product(req: ProductCreate, _admin: dict = Depends(require_admi
 # ---------------------------------------------------------------------------
 
 
+@app.put("/products/{product_id}", status_code=200)
+async def update_product(product_id: int, req: ProductCreate, _admin: dict = Depends(require_admin)):
+    conn = get_db()
+    row = conn.execute("SELECT id FROM products WHERE id = ?", (product_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+    specs_json = json.dumps(req.specifications, ensure_ascii=False) if req.specifications else None
+    conn.execute(
+        "UPDATE products SET name=?, description=?, price=?, stock=?, image_url=?, category=?, specifications=? WHERE id=?",
+        (req.name, req.description, req.price, req.stock, req.image_url, req.category, specs_json, product_id),
+    )
+    conn.commit()
+    conn.close()
+    product = {"id": product_id, "name": req.name, "description": req.description,
+               "price": req.price, "stock": req.stock, "image_url": req.image_url,
+               "category": req.category, "specifications": req.specifications}
+    await replicate_write("PUT", f"/internal/products/{product_id}", {**product, "specifications": specs_json})
+    return product
+
+
+@app.put("/internal/products/{product_id}", status_code=200, include_in_schema=False)
+def internal_update_product(product_id: int, req: dict):
+    conn = get_db()
+    conn.execute(
+        "UPDATE products SET name=?, description=?, price=?, stock=?, image_url=?, category=?, specifications=? WHERE id=?",
+        (req["name"], req.get("description"), req["price"], req["stock"],
+         req.get("image_url"), req.get("category"), req.get("specifications"), product_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
 @app.post("/internal/products", status_code=201, include_in_schema=False)
 def internal_create_product(req: dict):
     """Receives replicated writes from the primary. No JWT required."""

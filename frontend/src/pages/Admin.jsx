@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Package, DollarSign, Archive, LayoutDashboard, Image, Tag, FileText } from 'lucide-react'
+import { Plus, Package, DollarSign, Archive, LayoutDashboard, Image, Tag, FileText, Pencil, X } from 'lucide-react'
 import { api }      from '../api.js'
 import { useAuth }  from '../context/AuthContext.jsx'
 import { useToast } from '../components/Toast.jsx'
@@ -36,6 +36,7 @@ export default function Admin() {
   const [submitting, setSubmitting] = useState(false)
   const [form,       setForm]       = useState(EMPTY_FORM)
   const [imgError,   setImgError]   = useState(false)
+  const [editingId,  setEditingId]  = useState(null)  // null = criar, number = editar
   const { user }  = useAuth()
   const { show }  = useToast()
 
@@ -51,25 +52,58 @@ export default function Admin() {
 
   useEffect(() => { loadProducts() }, [])
 
+  const specsToText = (specs) => {
+    if (!specs || typeof specs !== 'object') return ''
+    return Object.entries(specs).map(([k, v]) => `${k}: ${v}`).join('\n')
+  }
+
+  const startEdit = (p) => {
+    setEditingId(p.id)
+    setImgError(false)
+    setForm({
+      name:           p.name           || '',
+      description:    p.description    || '',
+      price:          p.price          ?? '',
+      stock:          p.stock          ?? '',
+      image_url:      p.image_url      || '',
+      category:       p.category       || '',
+      specifications: specsToText(p.specifications),
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setForm(EMPTY_FORM)
+    setImgError(false)
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSubmitting(true)
+    const payload = {
+      name:           form.name,
+      description:    form.description || null,
+      price:          parseFloat(form.price),
+      stock:          parseInt(form.stock, 10),
+      image_url:      form.image_url || null,
+      category:       form.category  || null,
+      specifications: parseSpecs(form.specifications),
+    }
     try {
-      await api.createProduct({
-        name:           form.name,
-        description:    form.description || null,
-        price:          parseFloat(form.price),
-        stock:          parseInt(form.stock, 10),
-        image_url:      form.image_url || null,
-        category:       form.category  || null,
-        specifications: parseSpecs(form.specifications),
-      }, user.token)
-      show('Produto criado com sucesso!', 'success')
+      if (editingId) {
+        await api.updateProduct(editingId, payload, user.token)
+        show('Produto atualizado!', 'success')
+        setEditingId(null)
+      } else {
+        await api.createProduct(payload, user.token)
+        show('Produto criado com sucesso!', 'success')
+      }
       setForm(EMPTY_FORM)
       setImgError(false)
       loadProducts()
     } catch (err) {
-      show(err.message || 'Erro ao criar produto', 'error')
+      show(err.message || 'Erro ao salvar produto', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -117,9 +151,18 @@ export default function Admin() {
         {/* Form */}
         <div className="lg:col-span-2">
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 sticky top-20">
-            <h2 className="font-semibold text-white text-lg mb-5 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-violet-400" /> Novo Produto
-            </h2>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-semibold text-white text-lg flex items-center gap-2">
+                {editingId
+                  ? <><Pencil className="w-5 h-5 text-amber-400" /> Editar Produto</>
+                  : <><Plus className="w-5 h-5 text-violet-400" /> Novo Produto</>}
+              </h2>
+              {editingId && (
+                <button onClick={cancelEdit} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors">
+                  <X className="w-3.5 h-3.5" /> Cancelar
+                </button>
+              )}
+            </div>
             <form onSubmit={handleSubmit} className="space-y-4">
 
               <div>
@@ -185,11 +228,17 @@ export default function Admin() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 text-white font-semibold rounded-xl transition-all shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2 text-sm"
+                className={`w-full py-2.5 disabled:opacity-50 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-sm ${
+                  editingId
+                    ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 shadow-lg shadow-amber-500/20'
+                    : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-violet-500/20'
+                }`}
               >
                 {submitting
                   ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  : <><Plus className="w-4 h-4" /> Criar Produto</>
+                  : editingId
+                    ? <><Pencil className="w-4 h-4" /> Salvar Alterações</>
+                    : <><Plus className="w-4 h-4" /> Criar Produto</>
                 }
               </button>
             </form>
@@ -243,9 +292,19 @@ export default function Admin() {
                     )}
                   </div>
 
-                  <div className="text-right flex-shrink-0">
+                  <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
                     <p className="font-semibold text-white text-sm">{formatPrice(p.price)}</p>
                     <p className="text-xs text-slate-500">{p.stock} un.</p>
+                    <button
+                      onClick={() => startEdit(p)}
+                      className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-lg transition-all ${
+                        editingId === p.id
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          : 'text-slate-600 hover:text-amber-400 hover:bg-amber-500/10'
+                      }`}
+                    >
+                      <Pencil className="w-3 h-3" /> Editar
+                    </button>
                   </div>
                 </div>
               ))}

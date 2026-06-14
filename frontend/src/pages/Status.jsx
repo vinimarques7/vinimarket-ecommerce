@@ -69,8 +69,14 @@ export default function Status() {
   }, [lastUpdate])
 
   // Build services map including gateway itself
+  // Gateway returns "online"/"offline" string — normalize to object shape
+  const gatewayObj = data
+    ? (typeof data.gateway === 'string'
+        ? { healthy: data.gateway === 'online', last_check: data.timestamp, last_seen: data.gateway === 'online' ? data.timestamp : null }
+        : data.gateway)
+    : null
   const allServices = data
-    ? { gateway: data.gateway, ...data.services }
+    ? { gateway: gatewayObj, ...data.services }
     : {}
 
   const totalServices = Object.keys(allServices).length

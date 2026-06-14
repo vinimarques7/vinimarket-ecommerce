@@ -125,6 +125,22 @@ def get_user_orders(user_id: int, payload: dict = Depends(decode_token)):
     return [dict(r) for r in rows]
 
 
+@app.delete("/orders/{order_id}", status_code=204)
+def delete_order(order_id: int, payload: dict = Depends(decode_token)):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    if payload.get("role") != "admin" and payload["userId"] != row["user_id"]:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    conn.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+    conn.commit()
+    conn.close()
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------

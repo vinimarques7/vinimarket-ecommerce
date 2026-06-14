@@ -30,6 +30,10 @@ export const api = {
     request('/orders', { method: 'POST', headers: getHeaders(token), body: JSON.stringify(body) }),
   getUserOrders: (userId, token) =>
     request(`/orders/${userId}`, { headers: getHeaders(token) }),
+  deleteOrder: (orderId, token) =>
+    fetch(`/orders/${orderId}`, { method: 'DELETE', headers: getHeaders(token) }).then(r => {
+      if (!r.ok && r.status !== 204) throw new Error(`Erro ${r.status}`)
+    }),
 
   // Gateway status
   getStatus: () => request('/status'),

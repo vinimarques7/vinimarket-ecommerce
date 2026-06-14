@@ -136,14 +136,21 @@ export default function Status() {
         </div>
       )}
 
-      {/* Error state */}
-      {error && (
+      {/* Error state — só mostra tela cheia se não há dados ainda */}
+      {error && !data && (
         <div className="flex items-center gap-3 p-5 bg-red-500/10 border border-red-500/30 rounded-2xl mb-6">
           <WifiOff className="w-6 h-6 text-red-400" />
           <div>
             <p className="text-red-300 font-semibold">Gateway inacessível</p>
             <p className="text-slate-500 text-sm mt-0.5">{error}</p>
           </div>
+        </div>
+      )}
+      {/* Aviso discreto quando falha mas ainda há dados antigos */}
+      {error && data && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-4 text-xs text-amber-400">
+          <WifiOff className="w-3.5 h-3.5 flex-shrink-0" />
+          Falha ao atualizar — exibindo última leitura conhecida
         </div>
       )}
 

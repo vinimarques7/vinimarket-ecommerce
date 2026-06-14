@@ -76,7 +76,7 @@ export default function Status() {
         : data.gateway)
     : null
   const allServices = data
-    ? { gateway: gatewayObj, ...data.services }
+    ? { gateway: gatewayObj, ...Object.fromEntries(Object.entries(data.services).filter(([k]) => k !== 'products-replica')) }
     : {}
 
   const totalServices = Object.keys(allServices).length

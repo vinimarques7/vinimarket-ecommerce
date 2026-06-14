@@ -23,7 +23,11 @@ export default function Cart() {
     }
     try {
       for (const item of items) {
-        await api.createOrder({ product_id: item.id, quantity: item.quantity }, user.token)
+        await api.createOrder({
+          product_id:  item.id,
+          quantity:    item.quantity,
+          total_price: item.price * item.quantity,
+        }, user.token)
       }
       show(`${items.length} pedido(s) realizados com sucesso!`, 'success')
       clear()
